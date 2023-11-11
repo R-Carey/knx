@@ -36,15 +36,37 @@ declare module "next-auth" {
  *
  * @see https://next-auth.js.org/configuration/options
  */
+
+type UserDebate = {
+  id: number;
+  topic: string;
+  startTime: Date;
+  duration: number;
+};
+
 export const authOptions: NextAuthOptions = {
   callbacks: {
-    session: ({ session, user }) => ({
-      ...session,
-      user: {
-        ...session.user,
-        id: user.id,
-      },
-    }),
+    async session({ session, user }) {
+      // Fetch additional user data from the database, if necessary
+      // For example, you can fetch the latest debates the user is involved in
+      
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const userDebates: UserDebate[] = await db.debate.findMany({
+        where: { users: { some: { id: user.id } } },
+        take: 5,
+      }) as UserDebate[]; // Explicit type casting
+
+      // Return the updated session object
+      return {
+        ...session,
+        user: {
+          ...session.user,
+          id: user.id, // Already included
+          // Add custom user properties here
+          recentDebates: userDebates,
+        },
+      };
+    },
   },
   adapter: PrismaAdapter(db),
   providers: [
@@ -52,18 +74,10 @@ export const authOptions: NextAuthOptions = {
       clientId: env.GOOGLE_CLIENT_ID,
       clientSecret: env.GOOGLE_CLIENT_SECRET,
     }),
-    /**
-     * ...add more providers here.
-     *
-     * Most other providers require a bit more work than the Discord provider. For example, the
-     * GitHub provider requires you to add the `refresh_token_expires_in` field to the Account
-     * model. Refer to the NextAuth.js docs for the provider you want to use. Example:
-     *
-     * @see https://next-auth.js.org/providers/github
-     */
+    // ...add more providers here if needed...
   ],
   pages: {
-    signIn: "/signin"
+    signIn: "/signin",
   },
 };
 
